@@ -1,0 +1,26 @@
+# 由本部署脚本生成 —— 用预构建镜像，不在本机编译（小内存机器会 OOM）
+name: wb2api-up
+services:
+  wb2api:
+    image: workbuddy2api:proxy-patched
+    container_name: workbuddy2api
+    restart: unless-stopped
+    mem_limit: 256m
+    # 日志上限：json-file 默认不轮转，长期跑会慢慢把根分区写满（gcp 上踩过一次）
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      - "127.0.0.1:7863:7863"   # 只绑本机，面板/反代经宿主机访问
+    volumes:
+      - ./auths:/app/auths
+      - ./data:/app/data
+      - ./config.json:/app/config.json:ro
+networks:
+  default:
+    name: wbnet
+    external: true

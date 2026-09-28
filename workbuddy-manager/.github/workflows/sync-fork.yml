@@ -1,0 +1,93 @@
+# 定时把上游（ithtelab/workbuddy-manager）的新提交合并进本 fork，
+# 并显式触发一次镜像构建，让 ghcr 上的自建镜像跟着上游走。
+#
+# 两个必须说明的点：
+#
+# 1) 为什么要显式触发构建：GitHub 规定「用仓库自带的 GITHUB_TOKEN 发起的 push 不会
+#    再触发其它工作流」（workflow_dispatch / repository_dispatch 例外），所以同步后的
+#    push 唤不醒 build-image.yml —— 这里改用 workflow_dispatch 显式唤起。
+#
+# 2) 同步的是上游默认分支 main，它可能领先最新发行版，也就是构建出的镜像里可能含
+#    尚未发版的改动（镜像内 CHANGELOG 顶部会显示「未发布」）。要纯净发行版请直接
+#    用上游官方镜像 ghcr.io/ithtelab/workbuddy-manager:<版本>。
+#
+# 合并冲突时本工作流会失败并保留现场（绝不 force push），此时需人工合并。
+
+name: Sync fork
+
+on:
+  schedule:
+    # 每天北京时间 03:37 = UTC 19:37。
+    # 不取整点：GitHub schedule 在整点高峰排队严重，实测会被延迟甚至静默丢弃。
+    - cron: '37 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: sync-fork
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出本 fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 合并上游新提交
+        id: sync
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/ithtelab/workbuddy-manager.git
+          git fetch upstream --prune --tags
+
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "上游无新提交，跳过"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 不用 ff-only：本 fork 有自己的 CI 提交，历史必然分叉，需要 merge 提交。
+          if ! git merge --no-edit upstream/main; then
+            echo "::error::与上游合并冲突，需人工处理（未做任何推送）"
+            git merge --abort || true
+            exit 1
+          fi
+
+          # 直接推；若被拒则回退重试。
+          #
+          # 为什么会被拒：上游一旦改动 .github/workflows/*（如 release.yml），
+          # 而本工作流用的是仓库自带 GITHUB_TOKEN（GitHub App 身份），
+          # GitHub 会拒绝它创建/更新 workflow 文件：
+          #   refusing to allow a GitHub App to create or update workflow ... without `workflows` permission
+          # 实测 2026-09-24：合并成功但 push 被拒 → 整条同步失败。
+          # 处理：保留 fork 自身的工作流文件后重试（代码照常同步，只是不跟进上游的 CI 改动）。
+          # 想连工作流也一起跟进，就给仓库加一个有 workflow scope 的 PAT 存成 secret
+          # （如 SYNC_PAT），把下面 push 的凭据换成它即可。
+          if git push origin HEAD:main; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::push 被拒（GITHUB_TOKEN 无 workflows 权限，通常因上游改了 .github/workflows/*）"
+            echo "::warning::改为保留 fork 自身工作流后重试"
+            git checkout HEAD^1 -- .github/workflows/ || true
+            git commit -m "ci: 同步时保留 fork 自身工作流（GITHUB_TOKEN 无 workflows 权限）" || true
+            git push origin HEAD:main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 触发镜像构建
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 必须显式指定 --repo：仓库里同时配了 origin(fork) 与 upstream(上游)，
+          # 不指定时 gh 会解析到上游 ithtelab/workbuddy-manager 并报 404
+          # （build-image.yml 只存在于 fork 里）。2026-09-23 修。
+          gh workflow run build-image.yml --repo "$GITHUB_REPOSITORY" --ref main

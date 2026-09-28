@@ -1,0 +1,48 @@
+# 由本部署脚本生成 —— 用预构建镜像，不在本机编译
+name: wb2api-mgr
+services:
+  workbuddy-manager:
+    image: ghcr.io/yys9253462-gif/workbuddy-manager-multiarch:latest
+    container_name: workbuddy-manager
+    restart: unless-stopped
+    mem_limit: 320m
+    # 日志上限：面板会记录每一次 API 调用，没有上限就是慢性磁盘炸弹
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      TZ: Asia/Shanghai
+      WB_ADMIN_PASSWORD: "${WB_ADMIN_PASSWORD:?set in .env}"
+      WB2API_BASE: http://workbuddy2api:7863
+      WB2API_KEY: "${WB2API_KEY:?set in .env}"
+      WB2API_MODE: docker
+      WB2API_CONTAINER: workbuddy2api
+      WB_AUTH_DIR: /opt/workbuddy2api/auths
+      WB_UPSTREAM_CONFIG: /opt/workbuddy2api/config.json
+      WB_DATA_DIR: /app/data
+      WB_SECURE_COOKIE: auto
+      WB_TRUST_PROXY: "1"
+      WB_ENABLE_DOCS: "0"
+    ports:
+      - "127.0.0.1:7864:7864"   # 管理端必须藏在反代之后
+    volumes:
+      - ./data:/app/data
+      - ./server:/app/server
+      - ./web/out:/app/web/out
+      - ../workbuddy2api:/opt/workbuddy2api
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7864/api/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+# networks 必须在顶层（不是 service 的子键）—— 上次的教训：嵌进 service 会报
+# "additional properties 'external', 'name' not allowed"
+networks:
+  default:
+    name: wbnet
+    external: true

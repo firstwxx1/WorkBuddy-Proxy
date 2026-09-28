@@ -1,0 +1,66 @@
+# 行尾统一为 LF —— 这个仓库最终在 Linux 上运行，CRLF 会让 shell 脚本直接炸。
+#
+# 背景：脚本与配置在 Windows 上编辑时，Git 默认会把 LF 换成 CRLF。
+# 一旦带 CRLF 落到 Linux，第一行 shebang 就变成 "#!/usr/bin/env bash\r"，
+# 报错形如：bash: ./workbuddy-deploy.sh: /usr/bin/env: bad interpreter: No such file or directory
+# 或者逐行的 "\r: command not found"。
+#
+# 所以：脚本 / Dockerfile / 配置 一律强制 LF，检出时不转换。
+
+# 默认：仓库内一律 LF，检出时不做任何转换
+* text=auto eol=lf
+
+# Shell / 脚本 —— 必须 LF，否则 Linux 下无法执行
+*.sh            text eol=lf
+*.bash          text eol=lf
+*.conf          text eol=lf
+*.service       text eol=lf
+
+# 容器与构建
+Dockerfile      text eol=lf
+*.dockerfile    text eol=lf
+Makefile        text eol=lf
+*.mk            text eol=lf
+
+# 配置 / 数据
+*.json          text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.toml          text eol=lf
+*.ini           text eol=lf
+*.cfg           text eol=lf
+*.env.example   text eol=lf
+
+# 文档 / 前端
+*.md            text eol=lf
+*.txt           text eol=lf
+*.ts            text eol=lf
+*.tsx           text eol=lf
+*.js            text eol=lf
+*.jsx           text eol=lf
+*.mjs           text eol=lf
+*.css           text eol=lf
+
+# Go —— gofmt 只认 LF
+*.go            text eol=lf
+
+# Python
+*.py            text eol=lf
+
+# 二进制 —— 绝不做行尾转换，也不参与 diff
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.webp          binary
+*.svg           text eol=lf
+*.woff          binary
+*.woff2         binary
+*.ttf           binary
+*.eot           binary
+*.pdf           binary
+*.zip           binary
+*.gz            binary
+*.tgz           binary
+*.tar           binary
