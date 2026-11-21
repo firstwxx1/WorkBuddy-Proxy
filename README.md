@@ -247,7 +247,7 @@ sudo ./workbuddy-deploy.sh          # 菜单 → 7) 代理
 总览长这样：
 
 ```
-  26d714e4      socks5://proxy:***@172.82.74.159:1080   Nick
+  26d714e4      socks5://proxy:***@203.0.113.159:1080   Nick
   3614c6c7      直连
   ...
   共 9 个账号；配了 proxy 的走该出口，未配的直连。
@@ -265,7 +265,7 @@ python3 - <<'PY'
 import json
 p = "/opt/wb2api/workbuddy2api/auths/26d714e4-....json"
 d = json.load(open(p, encoding="utf-8"))
-d["proxy"] = "socks5://proxy:Sx2026%23QzWmR8tL4pN@172.82.74.159:1080"
+d["proxy"] = "socks5://proxy:Sx2026%23QzWmR8tL4pN@203.0.113.159:1080"
 json.dump(d, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 PY
 ```
@@ -293,19 +293,19 @@ docker logs --tail 50 workbuddy2api
 用系统 `curl` 直接走那条代理，确认出口 IP 就是你配的那台：
 
 ```bash
-curl -sS --max-time 10 --socks5-hostname proxy:Sx2026%23QzWmR8tL4pN@172.82.74.159:1080 \
+curl -sS --max-time 10 --socks5-hostname proxy:Sx2026%23QzWmR8tL4pN@203.0.113.159:1080 \
   http://ip-api.com/json/?fields=query,country,regionName,city,isp
 ```
 
 ```json
-{"query":"172.82.74.159","country":"United States","regionName":"New York","city":"Jamestown","isp":"HostRush"}
+{"query":"203.0.113.159","country":"United States","regionName":"New York","city":"Jamestown","isp":"HostRush"}
 ```
 
 出口 `query` 字段等于你代理的 IP，就说明这条代理通。再用**错误的密码**试一次，
 应当被拒绝（403 / 认证失败），用来确认「确实是走代理、不是悄悄直连」：
 
 ```bash
-curl -sS --max-time 10 --socks5-hostname proxy:WRONGPASS@172.82.74.159:1080 \
+curl -sS --max-time 10 --socks5-hostname proxy:WRONGPASS@203.0.113.159:1080 \
   http://ip-api.com/json/ ; echo "exit=$?"
 ```
 
