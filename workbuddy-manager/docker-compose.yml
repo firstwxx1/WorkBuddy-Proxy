@@ -5,6 +5,8 @@ services:
     image: ghcr.io/yys9253462-gif/workbuddy-manager-multiarch:latest
     container_name: workbuddy-manager
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     mem_limit: 320m
     # 日志上限：面板会记录每一次 API 调用，没有上限就是慢性磁盘炸弹
     logging:

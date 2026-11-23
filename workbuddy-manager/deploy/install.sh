@@ -305,6 +305,8 @@ sed -e "s#/opt/workbuddy-manager#${APP_DIR}#g" \
 # 若 venv 可用，改写 ExecStart 指向 venv
 if [ "$RT_PY" != "$PY" ]; then
   sed -i "s#^ExecStart=.*#ExecStart=${APP_DIR}/venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port ${MANAGER_PORT}#" \
+MemoryHigh=160M
+MemoryMax=256M
     /etc/systemd/system/workbuddy-web.service
 fi
 

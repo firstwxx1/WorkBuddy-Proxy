@@ -5,6 +5,8 @@ services:
     image: workbuddy2api:proxy-patched
     container_name: workbuddy2api
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     mem_limit: 256m
     # 日志上限：json-file 默认不轮转，长期跑会慢慢把根分区写满（gcp 上踩过一次）
     logging:
